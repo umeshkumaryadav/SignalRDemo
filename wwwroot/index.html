@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+
+    <title>SignalR Chat</title>
+
+    <!-- SignalR JavaScript Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+</head>
+
+<body>
+
+    <h2>SignalR Chat</h2>
+
+    <div>
+        <input id="userInput"
+               type="text"
+               placeholder="Enter your name" />
+    </div>
+
+    <br />
+
+    <div>
+        <input id="messageInput"
+               type="text"
+               placeholder="Enter message" />
+
+        <button id="sendButton">
+            Send
+        </button>
+    </div>
+
+    <br />
+
+    <div>
+        <strong>Status:</strong>
+        <span id="status">Connecting...</span>
+    </div>
+
+    <br />
+
+    <ul id="messagesList"></ul>
+
+    <script>
+
+        // 1. Create SignalR connection
+        const connection =
+            new signalR.HubConnectionBuilder()
+                .withUrl("/chatHub")
+                .withAutomaticReconnect()
+                .build();
+
+
+        // 2. Receive message from server
+        connection.on(
+            "ReceiveMessage",
+            function (user, message) {
+
+                const li =
+                    document.createElement("li");
+
+                li.textContent =
+                    user + ": " + message;
+
+                document
+                    .getElementById("messagesList")
+                    .appendChild(li);
+            });
+
+
+        // 3. Start SignalR connection
+        async function startConnection() {
+
+            try {
+
+                await connection.start();
+
+                console.log(
+                    "SignalR Connected"
+                );
+
+                document.getElementById("status")
+                    .textContent = "Connected";
+            }
+            catch (err) {
+
+                console.error(
+                    "SignalR Connection Error:",
+                    err
+                );
+
+                document.getElementById("status")
+                    .textContent = "Connection failed";
+
+                setTimeout(
+                    startConnection,
+                    5000
+                );
+            }
+        }
+
+
+        // 4. Send message to server
+        async function sendMessage() {
+
+            const user =
+                document.getElementById(
+                    "userInput"
+                ).value;
+
+            const message =
+                document.getElementById(
+                    "messageInput"
+                ).value;
+
+
+            if (!user || !message) {
+
+                alert(
+                    "Please enter user name and message."
+                );
+
+                return;
+            }
+
+
+            try {
+
+                await connection.invoke(
+                    "SendMessage",
+                    user,
+                    message
+                );
+
+                document.getElementById(
+                    "messageInput"
+                ).value = "";
+
+            }
+            catch (err) {
+
+                console.error(
+                    "Send Message Error:",
+                    err
+                );
+            }
+        }
+
+
+        // 5. Button click
+        document.getElementById(
+            "sendButton"
+        ).addEventListener(
+            "click",
+            sendMessage
+        );
+
+
+        // 6. Start connection
+        startConnection();
+
+    </script>
+
+</body>
+</html>
