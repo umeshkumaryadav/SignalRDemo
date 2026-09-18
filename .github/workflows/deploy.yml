@@ -12,59 +12,119 @@ jobs:
 
     env:
       DEPLOY_PATH: 'C:\inetpub\wwwroot\SignalRDemo'
+      PUBLISH_PATH: '${{ runner.temp }}\SignalRDemoPublish'
 
     steps:
 
+      # 1. Get source code from GitHub
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
+      # 2. Use .NET already installed on the Windows Runner
+      - name: Check .NET SDK
+        shell: powershell
+        run: |
+          Write-Host "Checking installed .NET SDK..."
+          dotnet --version
+          dotnet --info
 
+      # 3. Restore NuGet packages
       - name: Restore
         run: dotnet restore SignalRDemo/SignalRDemo.csproj
 
-      - name: Build
-        run: dotnet build SignalRDemo/SignalRDemo.csproj --configuration Release --no-restore
-
+      # 4. Publish application
       - name: Publish
-        run: dotnet publish SignalRDemo/SignalRDemo.csproj --configuration Release --output "${{ runner.temp }}\SignalRDemoPublish" --no-build
+        run: |
+          dotnet publish SignalRDemo/SignalRDemo.csproj `
+            --configuration Release `
+            --output "${{ env.PUBLISH_PATH }}" `
+            --no-restore
 
+      # 5. Stop IIS website
       - name: Stop IIS
         shell: powershell
         run: |
           Import-Module WebAdministration
-          Stop-Website -Name "SignalRDemo"
 
+          if (Get-Website -Name "SignalRDemo" -ErrorAction SilentlyContinue) {
+              Write-Host "Stopping IIS website: SignalRDemo"
+              Stop-Website -Name "SignalRDemo"
+          }
+          else {
+              Write-Host "IIS website SignalRDemo does not exist."
+          }
+
+      # 6. Deploy published files
       - name: Deploy to IIS
         shell: powershell
         run: |
-          $source = "${{ runner.temp }}\SignalRDemoPublish"
+          $source = "${{ env.PUBLISH_PATH }}"
           $destination = "${{ env.DEPLOY_PATH }}"
 
+          Write-Host "Source      : $source"
+          Write-Host "Destination : $destination"
+
           if (!(Test-Path $destination)) {
-              New-Item -ItemType Directory -Path $destination -Force
+              Write-Host "Creating deployment directory..."
+              New-Item -ItemType Directory -Path $destination -Force | Out-Null
           }
+
+          Write-Host "Copying published files..."
 
           robocopy $source $destination /MIR /R:2 /W:2
 
-          if ($LASTEXITCODE -le 7) {
+          $exitCode = $LASTEXITCODE
+
+          Write-Host "Robocopy exit code: $exitCode"
+
+          # Robocopy codes 0-7 are successful/non-fatal
+          if ($exitCode -le 7) {
               exit 0
           }
 
-          exit $LASTEXITCODE
+          exit $exitCode
 
+      # 7. Start IIS website
       - name: Start IIS
         if: success()
         shell: powershell
         run: |
           Import-Module WebAdministration
+
+          Write-Host "Starting IIS website: SignalRDemo"
+
           Start-Website -Name "SignalRDemo"
 
+          Write-Host "IIS website started."
+
+      # 8. Verify IIS website
+      - name: Verify IIS
+        if: success()
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+
+          $site = Get-Website -Name "SignalRDemo"
+
+          Write-Host "IIS Site Name : $($site.Name)"
+          Write-Host "IIS State     : $($site.State)"
+          Write-Host "IIS Binding   : $($site.Bindings.Collection.bindingInformation)"
+
+          if ($site.State -ne "Started") {
+              throw "IIS website SignalRDemo is not running."
+          }
+
+      # 9. Cleanup temporary publish files
       - name: Cleanup
         if: always()
         shell: powershell
         run: |
-          Remove-Item "${{ runner.temp }}\SignalRDemoPublish" -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Cleaning temporary publish folder..."
+
+          Remove-Item `
+            "${{ env.PUBLISH_PATH }}" `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+          Write-Host "Cleanup completed."
