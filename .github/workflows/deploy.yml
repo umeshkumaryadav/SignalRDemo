@@ -16,29 +16,26 @@ jobs:
 
     steps:
 
+      # 1. Get latest code from GitHub
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check .NET SDK
+      # 2. Restore NuGet packages
+      - name: Restore
         shell: powershell
         run: |
-          Write-Host "Installed .NET version:"
-          dotnet --version
+          dotnet restore SignalRDemo/SignalRDemo.csproj
 
-          Write-Host ""
-          Write-Host ".NET information:"
-          dotnet --info
-
-      - name: Restore
-        run: dotnet restore SignalRDemo/SignalRDemo.csproj
-
+      # 3. Publish ASP.NET Core application
       - name: Publish
+        shell: powershell
         run: |
           dotnet publish SignalRDemo/SignalRDemo.csproj `
             --configuration Release `
             --output "${{ env.PUBLISH_PATH }}" `
             --no-restore
 
+      # 4. Stop IIS
       - name: Stop IIS
         shell: powershell
         run: |
@@ -50,6 +47,7 @@ jobs:
               Stop-Website -Name "SignalRDemo"
           }
 
+      # 5. Copy published files to IIS
       - name: Deploy to IIS
         shell: powershell
         run: |
@@ -75,6 +73,7 @@ jobs:
 
           exit $exitCode
 
+      # 6. Start IIS
       - name: Start IIS
         if: success()
         shell: powershell
@@ -85,6 +84,7 @@ jobs:
 
           Start-Website -Name "SignalRDemo"
 
+      # 7. Verify IIS
       - name: Verify IIS
         if: success()
         shell: powershell
@@ -100,6 +100,7 @@ jobs:
               throw "SignalRDemo IIS website is not running."
           }
 
+      # 8. Cleanup temporary publish files
       - name: Cleanup
         if: always()
         shell: powershell
