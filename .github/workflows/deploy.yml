@@ -3,16 +3,15 @@ name: SignalRDemo CI/CD
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
-
   build-and-deploy:
 
     runs-on: self-hosted
 
     env:
-      DEPLOY_PATH: C:\inetpub\wwwroot\SignalRDemo
+      DEPLOY_PATH: 'C:\inetpub\wwwroot\SignalRDemo'
 
     steps:
 
@@ -58,6 +57,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Start IIS
+        if: success()
         shell: powershell
         run: |
           Import-Module WebAdministration
