@@ -30,6 +30,7 @@ jobs:
       - name: Publish
         shell: powershell
         run: |
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
           dotnet publish SignalRDemo/SignalRDemo.csproj `
             --configuration Release `
             --output "${{ env.PUBLISH_PATH }}" `
