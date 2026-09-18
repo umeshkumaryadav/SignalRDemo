@@ -16,23 +16,22 @@ jobs:
 
     steps:
 
-      # 1. Get source code from GitHub
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Use .NET already installed on the Windows Runner
       - name: Check .NET SDK
         shell: powershell
         run: |
-          Write-Host "Checking installed .NET SDK..."
+          Write-Host "Installed .NET version:"
           dotnet --version
+
+          Write-Host ""
+          Write-Host ".NET information:"
           dotnet --info
 
-      # 3. Restore NuGet packages
       - name: Restore
         run: dotnet restore SignalRDemo/SignalRDemo.csproj
 
-      # 4. Publish application
       - name: Publish
         run: |
           dotnet publish SignalRDemo/SignalRDemo.csproj `
@@ -40,21 +39,17 @@ jobs:
             --output "${{ env.PUBLISH_PATH }}" `
             --no-restore
 
-      # 5. Stop IIS website
       - name: Stop IIS
         shell: powershell
         run: |
           Import-Module WebAdministration
 
+          Write-Host "Stopping SignalRDemo IIS website..."
+
           if (Get-Website -Name "SignalRDemo" -ErrorAction SilentlyContinue) {
-              Write-Host "Stopping IIS website: SignalRDemo"
               Stop-Website -Name "SignalRDemo"
           }
-          else {
-              Write-Host "IIS website SignalRDemo does not exist."
-          }
 
-      # 6. Deploy published files
       - name: Deploy to IIS
         shell: powershell
         run: |
@@ -65,11 +60,8 @@ jobs:
           Write-Host "Destination : $destination"
 
           if (!(Test-Path $destination)) {
-              Write-Host "Creating deployment directory..."
               New-Item -ItemType Directory -Path $destination -Force | Out-Null
           }
-
-          Write-Host "Copying published files..."
 
           robocopy $source $destination /MIR /R:2 /W:2
 
@@ -77,27 +69,22 @@ jobs:
 
           Write-Host "Robocopy exit code: $exitCode"
 
-          # Robocopy codes 0-7 are successful/non-fatal
           if ($exitCode -le 7) {
               exit 0
           }
 
           exit $exitCode
 
-      # 7. Start IIS website
       - name: Start IIS
         if: success()
         shell: powershell
         run: |
           Import-Module WebAdministration
 
-          Write-Host "Starting IIS website: SignalRDemo"
+          Write-Host "Starting SignalRDemo IIS website..."
 
           Start-Website -Name "SignalRDemo"
 
-          Write-Host "IIS website started."
-
-      # 8. Verify IIS website
       - name: Verify IIS
         if: success()
         shell: powershell
@@ -106,25 +93,19 @@ jobs:
 
           $site = Get-Website -Name "SignalRDemo"
 
-          Write-Host "IIS Site Name : $($site.Name)"
-          Write-Host "IIS State     : $($site.State)"
-          Write-Host "IIS Binding   : $($site.Bindings.Collection.bindingInformation)"
+          Write-Host "Site  : $($site.Name)"
+          Write-Host "State : $($site.State)"
 
           if ($site.State -ne "Started") {
-              throw "IIS website SignalRDemo is not running."
+              throw "SignalRDemo IIS website is not running."
           }
 
-      # 9. Cleanup temporary publish files
       - name: Cleanup
         if: always()
         shell: powershell
         run: |
-          Write-Host "Cleaning temporary publish folder..."
-
           Remove-Item `
             "${{ env.PUBLISH_PATH }}" `
             -Recurse `
             -Force `
             -ErrorAction SilentlyContinue
-
-          Write-Host "Cleanup completed."
