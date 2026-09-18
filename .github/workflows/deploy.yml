@@ -1,0 +1,70 @@
+name: SignalRDemo CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  build-and-deploy:
+
+    runs-on: self-hosted
+
+    env:
+      DEPLOY_PATH: C:\inetpub\wwwroot\SignalRDemo
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore SignalRDemo/SignalRDemo.csproj
+
+      - name: Build
+        run: dotnet build SignalRDemo/SignalRDemo.csproj --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish SignalRDemo/SignalRDemo.csproj --configuration Release --output "${{ runner.temp }}\SignalRDemoPublish" --no-build
+
+      - name: Stop IIS
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          Stop-Website -Name "SignalRDemo"
+
+      - name: Deploy to IIS
+        shell: powershell
+        run: |
+          $source = "${{ runner.temp }}\SignalRDemoPublish"
+          $destination = "${{ env.DEPLOY_PATH }}"
+
+          if (!(Test-Path $destination)) {
+              New-Item -ItemType Directory -Path $destination -Force
+          }
+
+          robocopy $source $destination /MIR /R:2 /W:2
+
+          if ($LASTEXITCODE -le 7) {
+              exit 0
+          }
+
+          exit $LASTEXITCODE
+
+      - name: Start IIS
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          Start-Website -Name "SignalRDemo"
+
+      - name: Cleanup
+        if: always()
+        shell: powershell
+        run: |
+          Remove-Item "${{ runner.temp }}\SignalRDemoPublish" -Recurse -Force -ErrorAction SilentlyContinue
