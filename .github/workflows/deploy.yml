@@ -11,8 +11,8 @@ jobs:
     runs-on: self-hosted
 
     env:
-      DEPLOY_PATH: 'C:\inetpub\wwwroot\SignalRDemo'
-      PUBLISH_PATH: '${{ runner.temp }}\SignalRDemoPublish'
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      PUBLISH_PATH: ${{ vars.PUBLISH_PATH }}
 
     steps:
 
