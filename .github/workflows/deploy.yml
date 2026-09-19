@@ -25,18 +25,18 @@ jobs:
       # 3. Restore NuGet packages
       - name: Restore
         shell: powershell
-        run: dotnet restore .\SignalRDemo\SignalRDemo.csproj
+        run: dotnet restore .\SignalRDemo.csproj
 
       # 4. Build application
       - name: Build
         shell: powershell
-        run: dotnet build .\SignalRDemo\SignalRDemo.csproj --configuration Release --no-restore
+        run: dotnet build .\SignalRDemo.csproj --configuration Release --no-restore
 
       # 5. Publish application
       - name: Publish
         shell: powershell
         run: |
-          dotnet publish .\SignalRDemo\SignalRDemo.csproj `
+          dotnet publish .\SignalRDemo.csproj `
             --configuration Release `
             --output C:\inetpub\wwwroot\SignalRDemo `
             --no-restore
