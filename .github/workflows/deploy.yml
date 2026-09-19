@@ -8,125 +8,49 @@ on:
 jobs:
   build-and-deploy:
 
+    # Run GitHub Actions on your LOCAL Windows PC
     runs-on: self-hosted
-
-    env:
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-      PUBLISH_PATH: ${{ vars.PUBLISH_PATH }}
 
     steps:
 
-      # 1. Checkout
-      - name: Checkout code
+      # 1. Download latest code from GitHub
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2. Check installed .NET
-      - name: Check .NET
+      # 2. Check installed .NET SDK
+      - name: Check .NET Version
         shell: powershell
-        run: |
-          dotnet --version
+        run: dotnet --version
 
-      # 3. Restore
+      # 3. Restore NuGet packages
       - name: Restore
         shell: powershell
-        run: |
-          dotnet restore SignalRDemo/SignalRDemo.csproj
+        run: dotnet restore .\SignalRDemo\SignalRDemo.csproj
 
-      # 4. Publish
+      # 4. Build application
+      - name: Build
+        shell: powershell
+        run: dotnet build .\SignalRDemo\SignalRDemo.csproj --configuration Release --no-restore
+
+      # 5. Publish application
       - name: Publish
         shell: powershell
         run: |
-          if (Test-Path "${{ env.PUBLISH_PATH }}") {
-              Remove-Item "${{ env.PUBLISH_PATH }}" -Recurse -Force
-          }
-
-          New-Item `
-            -ItemType Directory `
-            -Path "${{ env.PUBLISH_PATH }}" `
-            -Force | Out-Null
-
-          dotnet publish SignalRDemo/SignalRDemo.csproj `
+          dotnet publish .\SignalRDemo\SignalRDemo.csproj `
             --configuration Release `
-            --output "${{ env.PUBLISH_PATH }}" `
+            --output C:\inetpub\wwwroot\SignalRDemo `
             --no-restore
 
-      # 5. Stop IIS
-      - name: Stop IIS
+      # 6. Restart IIS
+      - name: Restart IIS
+        shell: powershell
+        run: iisreset
+
+      # 7. Deployment completed
+      - name: Deployment Complete
         shell: powershell
         run: |
-          Import-Module WebAdministration
-
-          Write-Host "Stopping SignalRDemo..."
-
-          if (Get-Website -Name "SignalRDemo" -ErrorAction SilentlyContinue) {
-              Stop-Website -Name "SignalRDemo"
-          }
-
-      # 6. Deploy
-      - name: Deploy to IIS
-        shell: powershell
-        run: |
-          $source = "${{ env.PUBLISH_PATH }}"
-          $destination = "${{ env.DEPLOY_PATH }}"
-
-          Write-Host "Source      : $source"
-          Write-Host "Destination : $destination"
-
-          if (!(Test-Path $destination)) {
-              New-Item `
-                -ItemType Directory `
-                -Path $destination `
-                -Force | Out-Null
-          }
-
-          robocopy $source $destination /MIR /R:2 /W:2
-
-          $exitCode = $LASTEXITCODE
-
-          Write-Host "Robocopy exit code: $exitCode"
-
-          if ($exitCode -le 7) {
-              exit 0
-          }
-
-          exit $exitCode
-
-      # 7. Start IIS
-      - name: Start IIS
-        if: success()
-        shell: powershell
-        run: |
-          Import-Module WebAdministration
-
-          Write-Host "Starting SignalRDemo..."
-
-          Start-Website -Name "SignalRDemo"
-
-      # 8. Verify IIS
-      - name: Verify IIS
-        if: success()
-        shell: powershell
-        run: |
-          Import-Module WebAdministration
-
-          $site = Get-Website -Name "SignalRDemo"
-
-          Write-Host "Site  : $($site.Name)"
-          Write-Host "State : $($site.State)"
-
-          if ($site.State -ne "Started") {
-              throw "SignalRDemo IIS website is not running."
-          }
-
-      # 9. Cleanup
-      - name: Cleanup
-        if: always()
-        shell: powershell
-        run: |
-          if (Test-Path "${{ env.PUBLISH_PATH }}") {
-              Remove-Item `
-                "${{ env.PUBLISH_PATH }}" `
-                -Recurse `
-                -Force `
-                -ErrorAction SilentlyContinue
-          }
+          Write-Host "====================================="
+          Write-Host "SignalRDemo Deployment Completed"
+          Write-Host "IIS Path: C:\inetpub\wwwroot\SignalRDemo"
+          Write-Host "====================================="
